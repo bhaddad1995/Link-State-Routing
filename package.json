@@ -1,0 +1,6 @@
+{
+    "scripts": {
+        "build": "javac linkStateRouting.java",
+        "start": "java linkStateRouting"
+    }
+}
