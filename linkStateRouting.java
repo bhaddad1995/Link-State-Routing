@@ -12,17 +12,26 @@ import java.text.*;
 import java.util.*;
 
 public class linkStateRouting{
+    public ArrayList<router> routerList = new ArrayList<>();
+    public ArrayList<ArrayList<Integer>> linkedIDs = new ArrayList<>();
+    public ArrayList<ArrayList<Integer>> linkCosts = new ArrayList<>();
+    HashMap<Integer, String> IDandNetName = new HashMap<>();
+    ArrayList<Integer> IDindex = new ArrayList<>();
+
+    public static void main(String[] args){
+        linkStateRouting test = new linkStateRouting();
+        test.loadFile();
+        test.printRoutersLinksAndCosts();
+        test.createRouters();
+    }
 
     public void loadFile(){
-        HashMap<Integer, String> IDandNetName = new HashMap<>();
-        ArrayList<Integer> IDindex = new ArrayList<>();
         String[] splitID;
         String[] splitLink;
         String splitnetName;
 
-        ArrayList<ArrayList<Integer>> linkedIDs = new ArrayList<>();
-        LinkedList<Integer> linkCosts = new LinkedList<Integer>();
         ArrayList<Integer> temp = new ArrayList<>();
+        ArrayList<Integer> temp2 = new ArrayList<>();
         int cost;
         int routerID;
         int i = 0;
@@ -44,27 +53,36 @@ public class linkStateRouting{
                     IDandNetName.put(routerID, splitnetName);
                     if (count > 0) {
                         ArrayList<Integer> copiedTemp = new ArrayList<Integer>();
+                        ArrayList<Integer> copiedTemp2 = new ArrayList<Integer>();
                         for(Integer nt : temp){
                             copiedTemp.add(new Integer(nt));
                         }
+                        for(Integer nt : temp2){
+                            copiedTemp2.add(new Integer(nt));
+                        }
                         System.out.println("temp: " + temp);
+                        System.out.println("temp2: " + temp2);
                         linkedIDs.add(copiedTemp);
+                        linkCosts.add(copiedTemp2);
                         System.out.println("Being cleared");
                         temp.clear();
+                        temp2.clear();
                     }
                     count++;
 
                 }
 
                 if(line.charAt(0) == ' '){
-                    splitLink = line.split(" ", 2);
+                    splitLink = line.split(" ");
                     temp.add(Integer.parseInt(splitLink[1]));
+                    if(splitLink.length>2){
+                        temp2.add(Integer.parseInt(splitLink[2]));
+                        System.out.println("Being added to temp2: " + splitLink[2]);
+                    }else{
+                        temp2.add(1);
+                        System.out.println("Being added to temp2: " + splitLink[1]);
+                    }
                     System.out.println("Being added to temp: " + Integer.parseInt(splitLink[1]));
-                }
-
-                for (int o = 0; o < temp.size(); o++){
-//                    System.out.println(temp.get(o));
-
                 }
 
 
@@ -73,6 +91,23 @@ public class linkStateRouting{
 
 
             }
+
+            ArrayList<Integer> copiedTemp = new ArrayList<Integer>();
+            ArrayList<Integer> copiedTemp2 = new ArrayList<Integer>();
+            for(Integer nt : temp){
+                copiedTemp.add(new Integer(nt));
+            }
+            for(Integer nt : temp2){
+                copiedTemp2.add(new Integer(nt));
+            }
+            System.out.println("temp: " + temp);
+            System.out.println("temp2: " + temp2);
+            linkedIDs.add(copiedTemp);
+            linkCosts.add(copiedTemp2);
+            System.out.println("Being cleared");
+            temp.clear();
+            temp2.clear();
+
         } catch (IOException j) {
             System.err.print("Error loading file with exception:\n"+j);
             j.printStackTrace();
@@ -87,29 +122,62 @@ public class linkStateRouting{
             System.out.println("ID: " + IDKey);
             System.out.println("Network Name: " + networkName);
         }
+    }
 
+    public void printRoutersLinksAndCosts()
+    {
         for (int k = 0; k < linkedIDs.size(); k++){
-            System.out.println("ID: " + k);
-            System.out.println(linkedIDs.get(k));
+            System.out.println("ID: " + IDindex.get(k));
+            System.out.println("Linked IDs: " + linkedIDs.get(k));
+            System.out.println("Linked costs: " + linkCosts.get(k));
         }
     }
 
-    public void printAll()
-    {
-
+    public void createRouters(){
+        int i = 0;
+        for(Integer id : IDandNetName.keySet()){
+            HashMap<Integer,String> connectionMap = formConnectedRoutersMap(i);
+            HashMap<Integer,Integer> connectionCostMap = formConnectedRouterCostMap(i);
+            routerList.add(new router(id,IDandNetName.get(id), connectionMap, connectionCostMap, true));
+            i++;
+        }
     }
 
-    public static void main(String[] args){
-        linkStateRouting test = new linkStateRouting();
-        test.loadFile();
+    public HashMap<Integer,String> formConnectedRoutersMap(Integer index){
+        HashMap<Integer,String> connections = new HashMap<>();
+        ArrayList<Integer> connectedIDs = linkedIDs.get(index);
+        for(int i = 0; i<connectedIDs.size(); i++){
+            connections.put(connectedIDs.get(i), IDandNetName.get(connectedIDs.get(i)));
+        }
+        return connections;
+    }
+
+    public HashMap<Integer,Integer> formConnectedRouterCostMap(Integer index){
+        HashMap<Integer,Integer> connections = new HashMap<>();
+        ArrayList<Integer> connectedIDs = linkedIDs.get(index);
+        for(int i = 0; i<connectedIDs.size(); i++){
+            connections.put(connectedIDs.get(i), linkCosts.get(index).get(i));
+        }
+        return connections;
     }
 
 }
 
 class router{
-    public HashMap<String,Integer> connectedRouters = new HashMap<String,Integer>();
+    public HashMap<Integer,String> connectedRouters = new HashMap<Integer,String>();
+    public HashMap<Integer,Integer> connectedRouterCost = new HashMap<Integer,Integer>();
     public String routerName;
+    public Integer ID;
     public graph g;
+    boolean onOffStatus;
+
+    router(Integer ID, String name, HashMap<Integer,String> routerMap, HashMap<Integer,Integer> costMap, boolean onOff){
+        this.ID = ID;
+        this.routerName = name;
+        this.connectedRouters = routerMap;
+        this.connectedRouterCost = costMap;
+        this.onOffStatus = onOff;
+    }
 
     public String getRouterName(){
         return this.routerName;
@@ -119,7 +187,7 @@ class router{
         this.routerName = name;
     }
 
-    public void recievePacket(LSP packet, String forwarderId){
+    public void recievePacket(LSP packet, Integer forwarderId){
 
     }
 
@@ -200,4 +268,21 @@ class node{
     void setValue(int val){
         this.value = val;
     }
+}
+
+class Triplet<T, U, V> {
+
+    private final T first;
+    private final U second;
+    private final V third;
+
+    public Triplet(T first, U second, V third) {
+        this.first = first;
+        this.second = second;
+        this.third = third;
+    }
+
+    public T getFirst() { return first; }
+    public U getSecond() { return second; }
+    public V getThird() { return third; }
 }
