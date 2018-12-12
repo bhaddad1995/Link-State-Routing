@@ -1,14 +1,16 @@
-import java.util.Map;
-import java.util.Vector;
-import java.io.*;
-import java.util.Scanner;
-import java.util.*;
-import java.text.*;
-
 // Blake Haddad & Andy Nguyen
 // CS-570
 // Link State Routing Assignment
 
+import java.util.Map;
+import java.util.Vector;
+
+import javafx.scene.Node;
+
+import java.io.*;
+import java.util.Scanner;
+import java.util.*;
+import java.text.*;
 import java.util.*;
 
 public class linkStateRouting{
@@ -18,6 +20,7 @@ public class linkStateRouting{
     public ArrayList<ArrayList<Integer>> linkCosts = new ArrayList<>();
     HashMap<Integer, String> IDandNetName = new HashMap<>();
     ArrayList<Integer> IDindex = new ArrayList<>();
+    graph initialGraph;
 
     public static void main(String[] args){
         linkStateRouting test = new linkStateRouting();
@@ -132,22 +135,24 @@ public class linkStateRouting{
     public String promptUserInput(){
         String input = "";
         while(true){
-                System.out.println("Enter action:");
-                System.out.println("--Enter C to continue.");
-                System.out.println("--Enter Q to quit.");
-                System.out.println("--Enter P to print routing table.");
-                System.out.println("--Enter S followed by an id number to shut down a router. Ex: \"S 1\"");
-                System.out.println("--Enter T followed by an id number to start up a router. Ex: \"T 1\"");
-                input = reader.nextLine(); // Scans the next token of the input as an int.
-                if(input.equalsIgnoreCase("C")||input.equalsIgnoreCase("Q")||input.equalsIgnoreCase("P")){
+            System.out.println("-----------------------------------");
+            System.out.println("--Enter C to continue.");
+            System.out.println("--Enter Q to quit.");
+            System.out.println("--Enter P to print routing table.");
+            System.out.println("--Enter S followed by an id number to shut down a router. Ex: \"S 1\"");
+            System.out.println("--Enter T followed by an id number to start up a router. Ex: \"T 1\"");
+            System.out.print("Enter action: ");
+            input = reader.nextLine(); // Scans the next token of the input as an int.
+            if (input.equalsIgnoreCase("C") || input.equalsIgnoreCase("Q") || input.equalsIgnoreCase("P")) {
+                return input;
+            }
+            if (input.length() >= 3) {
+                String[] splitStr = input.split(" ");
+                if ((splitStr[0].equalsIgnoreCase("S") || splitStr[0].equalsIgnoreCase("T"))
+                        && isInteger(splitStr[1])) {
                     return input;
                 }
-                if(input.length() >= 3){
-                    String[] splitStr = input.split(" ");
-                    if((splitStr[0].equalsIgnoreCase("S") || splitStr[0].equalsIgnoreCase("T")) && isInteger(splitStr[1])){
-                        return input;
-                    }
-                }
+            }
         }
     }
     
@@ -156,7 +161,24 @@ public class linkStateRouting{
             System.out.println("Quitting program...");
             System.exit(0);
         }else if(input.equalsIgnoreCase("P")){
+            System.out.println("-----Routing Table-----");
             printRoutingTable();
+        }else if(input.equalsIgnoreCase("C")){
+            //Continue
+        }else if(input.length()>=3){
+            String[] splitStr = input.split(" ");
+            Integer routerId = Integer.parseInt(splitStr[1]);
+            if(routerList.containsKey(routerId)){
+                if(splitStr[0].equalsIgnoreCase("S")){
+                    System.out.println("Shutting down router " + routerId + "...");
+                    routerList.get(routerId).turnOffRouter();
+                }else if(splitStr[0].equalsIgnoreCase("T")){
+                    System.out.println("Starting up router " + routerId + "...");
+                    routerList.get(routerId).turnOnRouter();
+                }
+            }else{
+                System.out.println("Router ID does not exist in the current configuration.");
+            }
         }
     }
 
@@ -190,6 +212,11 @@ public class linkStateRouting{
         }
     }
 
+    // public void createInitialGraph(){
+    //     initialGraph = new graph(routerList.size());
+        
+    // }
+
     public void createRouters(){
         int i = 0;
         for(Integer id : IDandNetName.keySet()){
@@ -210,15 +237,6 @@ public class linkStateRouting{
         }
     }
 
-    // public HashMap<Integer,String> formConnectedRoutersMap(Integer index){
-    //     HashMap<Integer,String> connections = new HashMap<>();
-    //     ArrayList<Integer> connectedIDs = linkedIDs.get(index);
-    //     for(int i = 0; i<connectedIDs.size(); i++){
-    //         connections.put(connectedIDs.get(i), IDandNetName.get(connectedIDs.get(i)));
-    //     }
-    //     return connections;
-    // }
-
     public HashMap<Integer,Integer> formConnectedRouterCostMap(Integer index){
         HashMap<Integer,Integer> connections = new HashMap<>();
         ArrayList<Integer> connectedIDs = linkedIDs.get(index);
@@ -237,13 +255,21 @@ class router{
     public String routerName;
     public Integer ID;
     public graph g;
-    boolean onOffStatus;
+    boolean onStatus;
 
     router(Integer ID, String name, HashMap<Integer,Integer> costMap, boolean onOff){
         this.ID = ID;
         this.routerName = name;
         this.connectedRouterCost = costMap;
-        this.onOffStatus = onOff;
+        this.onStatus = onOff;
+    }
+
+    public void turnOffRouter(){
+        this.onStatus = false;
+    }
+
+    public void turnOnRouter(){
+        this.onStatus = true;
     }
 
     public String getRouterName(){
@@ -266,7 +292,7 @@ class router{
 
     public void recievePacket(LSP packet, Integer forwarderId){
         packet.decrementTTL();
-        if(packet.getTTL()==0 || compareSequenceNum(forwarderId, packet)){
+        if(packet.getTTL()==0 || compareSequenceNum(forwarderId, packet) || onStatus == false){
             //do nothing with packet
             return;
         }else{
@@ -276,21 +302,27 @@ class router{
         }
     }
 
-    //returns false if stored seq num is higher than new packets
+    //returns true if stored seq num is higher than new packets
     public boolean compareSequenceNum(Integer routerID, LSP packet){
         if(!routerIdToRecievedSequenceNum.containsKey(routerID)){
-            return false;
+            return true;
         }else{
             Integer currentSeqValue = routerIdToRecievedSequenceNum.get(routerID);
-            if(currentSeqValue > packet.getTTL()){
-                return false;
+            if(currentSeqValue > packet.getSeqNum()){
+                return true;
             }
         }
-        return true;
+        return false;
     }
 
     public void originatePacket(){
-        
+        if(onStatus == false){
+            //do nothing
+            return;
+        }else{
+            LSP packet = new LSP(getRouterName(),1,10);
+
+        }
     }
 }
 
@@ -298,8 +330,15 @@ class LSP{
     public String originRouter;
     public Integer seqNum;
     public Integer timeToLive;
+    public ArrayList<Triplet<Integer,String,Integer>> idNetworkCost = new ArrayList<>();
     //list of network names
     //list of each directly connected router, network behind it, and cost
+
+    LSP(String origin, Integer seq, Integer ttl){
+        this.originRouter = origin;
+        this.seqNum = seq;
+        this.timeToLive = ttl;
+    }
 
     public void decrementTTL(){
         this.timeToLive = this.timeToLive - 1;
@@ -308,12 +347,21 @@ class LSP{
     public Integer getTTL(){
         return this.timeToLive;
     }
+
+    public Integer getSeqNum(){
+        return this.seqNum;
+    }
+
+    public void incrementSeqNum(){
+        this.seqNum++;
+    }
 }
 
 class graph{
     public int[][] adjacencyMtrx;
     public int totalElements;
-    public List<node> nodeList = new ArrayList<>();
+    public List<Integer> routerIdList = new ArrayList<>();
+    public HashMap<Integer,Integer> routerIdToIndex = new HashMap<>();
 
     graph(){
 
@@ -324,48 +372,33 @@ class graph{
         this.totalElements = numElements;
     } 
 
-    public void addEdge(int start, int end){
-        adjacencyMtrx[start][end] = 1;
-        adjacencyMtrx[end][start] = 1;
+    public void addEdge(Integer routerIdStart, Integer routerIdEnd){
+        adjacencyMtrx[routerIdToIndex.get(routerIdStart)][routerIdToIndex.get(routerIdEnd)] = 1;
+        adjacencyMtrx[routerIdToIndex.get(routerIdEnd)][routerIdToIndex.get(routerIdStart)] = 1;
     }
 
     public void addNode(int value){
-        nodeList.add(new node(value));
+        routerIdList.add(value);
+        routerIdToIndex.put(routerIdList.size(), value);
     }
 
-    public void printNodes(){
-        for(int i = 0; i<nodeList.size(); i++){
-            System.out.println(nodeList.get(i).getValue());
-        }
-    }
+    // public void printNodes(){
+    //     for(int i = 0; i<nodeList.size(); i++){
+    //         System.out.println(nodeList.get(i).getValue());
+    //     }
+    // }
 
-    public void printAdjMatrix(){
-        int a = adjacencyMtrx.length;
-        int b = adjacencyMtrx[0].length;
-        System.out.println(a + " " + b);
-        for(int i = 0; i<adjacencyMtrx.length; i++){
-            for(int j = 0; j<adjacencyMtrx[0].length; j++){
-                System.out.print(adjacencyMtrx[i][j] + " ");
-            }
-            System.out.print("\n");
-        }
-    }
-}
-
-class node{
-    int value;
-
-    node(int val){
-        this.value = val;
-    }
-
-    int getValue(){
-        return this.value;
-    }
-
-    void setValue(int val){
-        this.value = val;
-    }
+    // public void printAdjMatrix(){
+    //     int a = adjacencyMtrx.length;
+    //     int b = adjacencyMtrx[0].length;
+    //     System.out.println(a + " " + b);
+    //     for(int i = 0; i<adjacencyMtrx.length; i++){
+    //         for(int j = 0; j<adjacencyMtrx[0].length; j++){
+    //             System.out.print(adjacencyMtrx[i][j] + " ");
+    //         }
+    //         System.out.print("\n");
+    //     }
+    // }
 }
 
 class Triplet<T, U, V> {
