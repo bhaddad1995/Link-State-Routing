@@ -12,7 +12,8 @@ import java.text.*;
 import java.util.*;
 
 public class linkStateRouting{
-    public ArrayList<router> routerList = new ArrayList<>();
+    Scanner reader = new Scanner(System.in);  // Reading from System.in
+    public HashMap<Integer,router> routerList = new HashMap<>();
     public ArrayList<ArrayList<Integer>> linkedIDs = new ArrayList<>();
     public ArrayList<ArrayList<Integer>> linkCosts = new ArrayList<>();
     HashMap<Integer, String> IDandNetName = new HashMap<>();
@@ -21,8 +22,12 @@ public class linkStateRouting{
     public static void main(String[] args){
         linkStateRouting test = new linkStateRouting();
         test.loadFile();
-        test.printRoutersLinksAndCosts();
+        // test.printRoutersLinksAndCosts();
         test.createRouters();
+        test.addConnections();
+        while(true){
+            test.handleInput(test.promptUserInput());
+        }
     }
 
     public void loadFile(){
@@ -124,6 +129,58 @@ public class linkStateRouting{
         }
     }
 
+    public String promptUserInput(){
+        String input = "";
+        while(true){
+                System.out.println("Enter action:");
+                System.out.println("--Enter C to continue.");
+                System.out.println("--Enter Q to quit.");
+                System.out.println("--Enter P to print routing table.");
+                System.out.println("--Enter S followed by an id number to shut down a router. Ex: \"S 1\"");
+                System.out.println("--Enter T followed by an id number to start up a router. Ex: \"T 1\"");
+                input = reader.nextLine(); // Scans the next token of the input as an int.
+                if(input.equalsIgnoreCase("C")||input.equalsIgnoreCase("Q")||input.equalsIgnoreCase("P")){
+                    return input;
+                }
+                if(input.length() >= 3){
+                    String[] splitStr = input.split(" ");
+                    if((splitStr[0].equalsIgnoreCase("S") || splitStr[0].equalsIgnoreCase("T")) && isInteger(splitStr[1])){
+                        return input;
+                    }
+                }
+        }
+    }
+    
+    public void handleInput(String input){
+        if(input.equalsIgnoreCase("Q")){
+            System.out.println("Quitting program...");
+            System.exit(0);
+        }else if(input.equalsIgnoreCase("P")){
+            printRoutingTable();
+        }
+    }
+
+    public void printRoutingTable(){
+        for(Integer ids : routerList.keySet()){
+            routerList.get(ids).printRoutingTable();
+        }
+    }
+    public static boolean isInteger(String s) {
+        return isInteger(s,10);
+    }
+    
+    public static boolean isInteger(String s, int radix) {
+        if(s.isEmpty()) return false;
+        for(int i = 0; i < s.length(); i++) {
+            if(i == 0 && s.charAt(i) == '-') {
+                if(s.length() == 1) return false;
+                else continue;
+            }
+            if(Character.digit(s.charAt(i),radix) < 0) return false;
+        }
+        return true;
+    }
+
     public void printRoutersLinksAndCosts()
     {
         for (int k = 0; k < linkedIDs.size(); k++){
@@ -136,21 +193,31 @@ public class linkStateRouting{
     public void createRouters(){
         int i = 0;
         for(Integer id : IDandNetName.keySet()){
-            HashMap<Integer,String> connectionMap = formConnectedRoutersMap(i);
+            //HashMap<Integer,String> connectionMap = formConnectedRoutersMap(i);
             HashMap<Integer,Integer> connectionCostMap = formConnectedRouterCostMap(i);
-            routerList.add(new router(id,IDandNetName.get(id), connectionMap, connectionCostMap, true));
+            routerList.put(id,new router(id,IDandNetName.get(id), connectionCostMap, true));
             i++;
         }
     }
-
-    public HashMap<Integer,String> formConnectedRoutersMap(Integer index){
-        HashMap<Integer,String> connections = new HashMap<>();
-        ArrayList<Integer> connectedIDs = linkedIDs.get(index);
-        for(int i = 0; i<connectedIDs.size(); i++){
-            connections.put(connectedIDs.get(i), IDandNetName.get(connectedIDs.get(i)));
+    
+    public void addConnections(){
+        for(int i=0; i<linkedIDs.size(); i++){
+            router currentRouter = routerList.get(IDindex.get(i));
+            for(int j=0;j<linkedIDs.get(i).size();j++){
+                System.out.println("Adding connection to router " + linkedIDs.get(i).get(j) + " from router: " + IDindex.get(i));
+                currentRouter.addConnectedRouter(linkedIDs.get(i).get(j),routerList.get(linkedIDs.get(i).get(j)));
+            }
         }
-        return connections;
     }
+
+    // public HashMap<Integer,String> formConnectedRoutersMap(Integer index){
+    //     HashMap<Integer,String> connections = new HashMap<>();
+    //     ArrayList<Integer> connectedIDs = linkedIDs.get(index);
+    //     for(int i = 0; i<connectedIDs.size(); i++){
+    //         connections.put(connectedIDs.get(i), IDandNetName.get(connectedIDs.get(i)));
+    //     }
+    //     return connections;
+    // }
 
     public HashMap<Integer,Integer> formConnectedRouterCostMap(Integer index){
         HashMap<Integer,Integer> connections = new HashMap<>();
@@ -164,17 +231,17 @@ public class linkStateRouting{
 }
 
 class router{
-    public HashMap<Integer,String> connectedRouters = new HashMap<Integer,String>();
+    public HashMap<Integer,router> connectedRouters = new HashMap<Integer,router>();
     public HashMap<Integer,Integer> connectedRouterCost = new HashMap<Integer,Integer>();
+    public HashMap<Integer,Integer> routerIdToRecievedSequenceNum = new HashMap<Integer,Integer>();
     public String routerName;
     public Integer ID;
     public graph g;
     boolean onOffStatus;
 
-    router(Integer ID, String name, HashMap<Integer,String> routerMap, HashMap<Integer,Integer> costMap, boolean onOff){
+    router(Integer ID, String name, HashMap<Integer,Integer> costMap, boolean onOff){
         this.ID = ID;
         this.routerName = name;
-        this.connectedRouters = routerMap;
         this.connectedRouterCost = costMap;
         this.onOffStatus = onOff;
     }
@@ -187,8 +254,39 @@ class router{
         this.routerName = name;
     }
 
-    public void recievePacket(LSP packet, Integer forwarderId){
+    public void addConnectedRouter(Integer id, router r){
+        this.connectedRouters.put(id, r);
+    }
+    
+    public void printRoutingTable(){
+        for(Integer ids : connectedRouters.keySet()){
+            System.out.println(getRouterName() + ", " + connectedRouters.get(ids).getRouterName());
+        }
+    }
 
+    public void recievePacket(LSP packet, Integer forwarderId){
+        packet.decrementTTL();
+        if(packet.getTTL()==0 || compareSequenceNum(forwarderId, packet)){
+            //do nothing with packet
+            return;
+        }else{
+            // packets information should be compared to the receiving 
+            // router’s connectivity graph and the LSP should be sent out (in the form of function calls) 
+            // to all directly connected routers except the one on which it was received.
+        }
+    }
+
+    //returns false if stored seq num is higher than new packets
+    public boolean compareSequenceNum(Integer routerID, LSP packet){
+        if(!routerIdToRecievedSequenceNum.containsKey(routerID)){
+            return false;
+        }else{
+            Integer currentSeqValue = routerIdToRecievedSequenceNum.get(routerID);
+            if(currentSeqValue > packet.getTTL()){
+                return false;
+            }
+        }
+        return true;
     }
 
     public void originatePacket(){
